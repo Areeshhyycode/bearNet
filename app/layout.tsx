@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { AppShell } from "@/components/layout/AppShell";
+import { NotesProvider } from "@/lib/notes-store";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -31,13 +32,20 @@ export default function RootLayout({
           href="https://fonts.gstatic.com"
           crossOrigin=""
         />
+        {/* App Router loads this once for the whole app, so the
+            pages/_document warning this rule targets does not apply.
+            A plain <link> also degrades gracefully when offline,
+            unlike next/font which fetches at build time. */}
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
           href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
       </head>
       <body className="bg-surface font-body-md text-body-md text-on-surface antialiased">
-        <AppShell>{children}</AppShell>
+        <NotesProvider>
+          <AppShell>{children}</AppShell>
+        </NotesProvider>
       </body>
     </html>
   );

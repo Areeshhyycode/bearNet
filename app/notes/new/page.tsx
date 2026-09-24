@@ -11,7 +11,13 @@ export const metadata: Metadata = {
   description: "A blank cozy page for today's networking lesson.",
 };
 
-export default function NewNotePage() {
+export default async function NewNotePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ topic?: string }>;
+}) {
+  const { topic } = await searchParams;
+
   return (
     <PageContainer>
       <div className="flex flex-col gap-space-md">
@@ -35,14 +41,14 @@ export default function NewNotePage() {
                 <span aria-hidden>🎀</span> New note
               </Badge>
               <Badge tone="outline" size="md">
-                Nothing saved yet
+                Saves to this browser
               </Badge>
             </>
           }
         />
       </div>
 
-      <NoteEditor />
+      <NoteEditor initialTopicId={topic} />
     </PageContainer>
   );
 }

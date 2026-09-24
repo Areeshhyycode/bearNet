@@ -2,7 +2,7 @@
 
 A cozy, baby-pink study sanctuary for learning **networking & cybersecurity**, guarded by three original bear mascots.
 
-> **Stage 1 — frontend only.** No backend, database, auth, AI, or API routes. Every screen runs on static mock data so the design, components, routes and responsive layout can be locked in before any feature logic is added.
+> **Frontend only.** No backend, database, auth, AI, or API routes. Notes are real and persist in the browser via `localStorage`; everything else still runs on static mock data.
 
 ## Getting started
 
@@ -72,6 +72,19 @@ Tokens live in `tailwind.config.ts` and mirror `DESIGN.md`:
 
 Grizzly (brown, notes), Panda (AI tutor) and Polar (cyber lab) are **original SVG characters** drawn in `components/bears/`. No third-party character art is used anywhere in this project.
 
+## Notes: what actually works
+
+Notes are a real feature, stored under the `bearnet:notes:v1` key in `localStorage`:
+
+- **Create, edit and delete** notes, with a confirmation step before deleting
+- **Create and delete topics** (deleting a topic removes its notes)
+- **Markdown toolbar** that wraps the current selection — heading, bold, italic, lists, code, link, image
+- **Search, topic filter and private/public filter**, combined and live
+- **Derived on save** — slug id, preview, paragraph split, read time, updated timestamp
+- Topic counts, dashboard stats and the recent-notes strip all read the same store
+
+The data never leaves the browser, so it is per-device and cleared with site data. `lib/storage.ts` guards every access, so private windows and blocked storage degrade to in-memory instead of crashing.
+
 ## What is intentionally not built yet
 
-Saving notes, chatting with a real model, grading quizzes and exams, running lab commands, auth and persistence. Buttons render the correct states, but no data leaves the browser.
+Chatting with a real model, grading quizzes and exams, running lab commands, auth, and a server-side database. Those buttons render the correct states but do not act.

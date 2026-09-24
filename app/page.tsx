@@ -1,17 +1,18 @@
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { PageContainer } from "@/components/layout/AppShell";
 import { HeroBanner } from "@/components/dashboard/HeroBanner";
 import { ModuleCard } from "@/components/dashboard/ModuleCard";
 import { TipOfTheDay } from "@/components/dashboard/TipOfTheDay";
 import { ExamCountdown } from "@/components/dashboard/ExamCountdown";
+import {
+  NotesCountStat,
+  NotesModuleInset,
+  RecentNotesSection,
+} from "@/components/dashboard/NotesSummary";
 import { JourneyTrack } from "@/components/progress/JourneyTrack";
 import { InsetBox, Panel } from "@/components/ui/card";
-import { Badge, VisibilityBadge } from "@/components/ui/badge";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { StatCard } from "@/components/ui/stat-card";
-import { LEARNER, RECENT_NOTES } from "@/lib/mock-data";
-import { formatRelative } from "@/lib/utils";
+import { LEARNER } from "@/lib/mock-data";
 
 export default function DashboardPage() {
   return (
@@ -38,12 +39,7 @@ export default function DashboardPage() {
           value={`${LEARNER.topicsCompleted}/${LEARNER.topicsTotal}`}
           caption="Across 9 networking tracks"
         />
-        <StatCard
-          emoji="📝"
-          label="Notes Saved"
-          value={LEARNER.notesSaved}
-          caption="4 topics active this week"
-        />
+        <NotesCountStat />
       </section>
 
       {/* Core modules */}
@@ -64,25 +60,7 @@ export default function DashboardPage() {
             cta="Open Notes"
             footnote="Synced with Grizzly's study summaries, subnet cheat-sheets and OSI layer colour codes."
           >
-            <InsetBox className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between font-body-sm text-body-sm text-on-surface-variant">
-                <span className="font-medium text-on-surface">
-                  {LEARNER.notesSaved} Notes saved
-                </span>
-                <Badge tone="neutral">4 Topics active</Badge>
-              </div>
-              <div className="flex items-start gap-1.5 pt-1 font-body-sm text-body-sm text-on-surface">
-                <span className="text-tertiary" aria-hidden>
-                  📌
-                </span>
-                <span className="truncate">
-                  Recent:{" "}
-                  <strong className="font-semibold">
-                    TCP 3-Way Handshake vs UDP
-                  </strong>
-                </span>
-              </div>
-            </InsetBox>
+            <NotesModuleInset />
           </ModuleCard>
 
           <ModuleCard
@@ -258,47 +236,7 @@ export default function DashboardPage() {
       </Panel>
 
       {/* Recent notes */}
-      <section className="flex flex-col gap-space-lg">
-        <SectionHeading
-          eyebrow="Straight from your notebook"
-          title="Recent Notes"
-          size="md"
-          aside={
-            <Link
-              href="/notes"
-              className="inline-flex items-center gap-1 rounded-full bg-surface-container-low px-3 py-1.5 font-body-sm text-body-sm font-semibold text-on-surface-variant transition-colors hover:text-primary"
-            >
-              Browse all notes <ArrowRight className="h-4 w-4" />
-            </Link>
-          }
-        />
-        <div className="grid grid-cols-1 gap-space-md sm:grid-cols-2 xl:grid-cols-4">
-          {RECENT_NOTES.map((note) => (
-            <Link
-              key={note.id}
-              href={`/notes/${note.id}`}
-              className="group flex flex-col gap-2 rounded-[22px] bg-surface-container-lowest p-space-md shadow-cozy transition-all duration-300 hover:-translate-y-1 hover:shadow-float"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-xl" aria-hidden>
-                  {note.emoji}
-                </span>
-                <VisibilityBadge visibility={note.visibility} />
-              </div>
-              <h3 className="font-headline-md text-[15px] font-bold leading-snug text-on-surface">
-                {note.title}
-              </h3>
-              <p className="line-clamp-2 font-body-sm text-body-sm text-on-surface-variant">
-                {note.preview}
-              </p>
-              <div className="mt-auto flex items-center justify-between pt-2 font-label-badge text-label-badge text-on-surface-variant">
-                <span>{note.topic}</span>
-                <span>{formatRelative(note.updatedAt)}</span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
+      <RecentNotesSection />
 
       {/* Tip + countdown */}
       <section className="grid grid-cols-1 gap-space-lg lg:grid-cols-12">
