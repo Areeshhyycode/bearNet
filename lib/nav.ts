@@ -6,6 +6,7 @@ import {
   MessageCircleHeart,
   Settings,
   Sparkles,
+  Users,
   TerminalSquare,
   TrendingUp,
 } from "lucide-react";
@@ -35,6 +36,14 @@ export const NAV_ITEMS: NavItem[] = [
     icon: BookOpen,
     emoji: "📝",
     match: "/notes",
+  },
+  {
+    label: "Community",
+    shortLabel: "Community",
+    href: "/community",
+    icon: Users,
+    emoji: "🌍",
+    match: "/community",
   },
   {
     label: "AI Tutor",

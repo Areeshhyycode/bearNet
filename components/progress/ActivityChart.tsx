@@ -4,8 +4,8 @@ import { useProgress } from "@/lib/progress-store";
 
 /** Weekly study minutes as soft blush bars, from real session time. */
 export function ActivityChart() {
-  const { weeklyActivity, profile, minutesThisWeek } = useProgress();
-  const goal = profile.dailyGoalMinutes;
+  const { weeklyActivity, preferences, minutesThisWeek } = useProgress();
+  const goal = preferences.dailyGoalMinutes;
 
   // Keep bars readable even on a quiet week.
   const max = Math.max(goal, ...weeklyActivity.map((d) => d.minutes), 1);

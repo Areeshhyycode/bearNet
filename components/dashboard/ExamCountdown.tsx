@@ -6,7 +6,7 @@ import { useProgress } from "@/lib/progress-store";
 
 /** Certification readiness, measured from real exam runs. */
 export function ExamCountdown() {
-  const { profile, runs, examsCompleted, quizAccuracy, streak } = useProgress();
+  const { preferences, runs, examsCompleted, quizAccuracy, streak } = useProgress();
 
   const examRuns = runs.filter((run) => run.mode === "exam");
   const readiness =
@@ -41,7 +41,7 @@ export function ExamCountdown() {
           <Badge tone="lavender">🔥 {streak}d streak</Badge>
         </div>
         <h3 className="font-headline-md text-[18px] font-bold text-on-surface">
-          {profile.certTarget}
+          {preferences.certTarget}
         </h3>
         <p className="font-body-sm text-body-sm text-on-surface-variant">
           {readiness === null

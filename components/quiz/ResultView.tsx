@@ -32,11 +32,11 @@ export function ResultView({
 
   /** Notes the learner already has on the topics they fumbled. */
   const recommended = notes
-    .filter((note) => revise.some((topic) => note.topic === topic.topic))
+    .filter((note) => revise.some((topic) => note.category === topic.topic))
     .slice(0, 3);
 
   const missingTopics = revise
-    .filter((topic) => !notes.some((note) => note.topic === topic.topic))
+    .filter((topic) => !notes.some((note) => note.category === topic.topic))
     .slice(0, 3);
 
   const headline =

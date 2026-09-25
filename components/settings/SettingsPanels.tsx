@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Field, Input, Toggle } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
-import { Toast } from "@/components/ui/toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { BearMascot, type BearVariant } from "@/components/bears/BearMascot";
+import { useAuth } from "@/lib/auth-context";
 import { useNotes } from "@/lib/notes-store";
 import { useProgress } from "@/lib/progress-store";
+import { useToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 const BUDDIES: { id: BearVariant; name: string; role: string }[] = [
@@ -33,43 +36,42 @@ const PREF_ROWS = [
   },
   {
     key: "publicProfile",
-    title: "Public study profile",
-    caption: "Share your rank and badges",
+    title: "Show my name on public notes",
+    caption: "Authors are shown on the community feed",
   },
   { key: "reducedMotion", title: "Reduced motion", caption: "Calm the floating bears" },
 ] as const;
 
-/** Every control writes straight through to the persisted profile. */
 export function SettingsPanels() {
-  const { notes, resetToSeed } = useNotes();
-  const { profile, updateProfile, xp, level, rank, resetProgress } = useProgress();
+  const { user, logout } = useAuth();
+  const { notes } = useNotes();
+  const { preferences, updatePreferences, xp, level, resetProgress } =
+    useProgress();
+  const toast = useToast();
 
-  const [name, setName] = useState(profile.name);
-  const [handle, setHandle] = useState(profile.handle);
-  const [goal, setGoal] = useState(String(profile.dailyGoalMinutes));
-  const [cert, setCert] = useState(profile.certTarget);
-  const [toast, setToast] = useState<string | null>(null);
+  const [handle, setHandle] = useState(preferences.handle);
+  const [goal, setGoal] = useState(String(preferences.dailyGoalMinutes));
+  const [cert, setCert] = useState(preferences.certTarget);
   const [confirmWipe, setConfirmWipe] = useState(false);
 
+  // Adopt server values once they load.
+  useEffect(() => {
+    setHandle(preferences.handle);
+    setGoal(String(preferences.dailyGoalMinutes));
+    setCert(preferences.certTarget);
+  }, [preferences.handle, preferences.dailyGoalMinutes, preferences.certTarget]);
+
   function saveProfile() {
-    const parsedGoal = Number.parseInt(goal, 10);
-    updateProfile({
-      name: name.trim() || "Bear Learner",
+    const parsed = Number.parseInt(goal, 10);
+    updatePreferences({
       handle: handle.trim() || "@bearnet",
-      dailyGoalMinutes:
-        Number.isFinite(parsedGoal) && parsedGoal > 0 ? parsedGoal : 45,
+      dailyGoalMinutes: Number.isFinite(parsed) && parsed > 0 ? parsed : 45,
       certTarget: cert.trim() || "CompTIA Network+ N10-008",
     });
-    setToast("🎀 Settings saved");
+    toast.success("🎀 Settings saved");
   }
 
-  function discard() {
-    setName(profile.name);
-    setHandle(profile.handle);
-    setGoal(String(profile.dailyGoalMinutes));
-    setCert(profile.certTarget);
-    setToast("Changes discarded");
-  }
+  const publicCount = notes.filter((n) => n.visibility === "public").length;
 
   return (
     <>
@@ -80,43 +82,36 @@ export function SettingsPanels() {
             🎀 Profile
           </h2>
 
-          <div className="flex items-center gap-space-md rounded-[20px] bg-surface-container-low p-space-md">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary font-headline-md text-headline-md font-bold text-on-primary">
-              {profile.name.slice(0, 1).toUpperCase()}
+          <div className="flex flex-wrap items-center gap-space-md rounded-[20px] bg-surface-container-low p-space-md">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary font-headline-md text-headline-md font-bold text-on-primary">
+              {(user?.name ?? "B").slice(0, 1).toUpperCase()}
             </div>
-            <div className="min-w-0">
-              <div className="font-headline-md text-[16px] font-bold text-on-surface">
-                {profile.name}
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-headline-md text-[16px] font-bold text-on-surface">
+                {user?.name}
               </div>
-              <div className="font-body-sm text-body-sm text-on-surface-variant">
-                {profile.handle} • {rank.title}
+              <div className="truncate font-body-sm text-body-sm text-on-surface-variant">
+                {user?.email}
               </div>
               <div className="mt-1 flex flex-wrap gap-1.5">
                 <Badge tone="blush">Level {level}</Badge>
                 <Badge tone="lavender">{xp.toLocaleString()} XP</Badge>
                 <Badge tone="outline">
-                  {notes.length} note{notes.length === 1 ? "" : "s"}
+                  {notes.length} note{notes.length === 1 ? "" : "s"} · {publicCount}{" "}
+                  public
                 </Badge>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-space-md sm:grid-cols-2">
-            <Field label="Display name">
-              <Input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Your name"
-              />
-            </Field>
-            <Field label="Study handle">
-              <Input
-                value={handle}
-                onChange={(event) => setHandle(event.target.value)}
-                placeholder="@bearnet"
-              />
-            </Field>
-          </div>
+          <p className="font-body-sm text-body-sm text-on-surface-variant">
+            Your name and email come from your account and appear on notes you
+            choose to publish.
+          </p>
+
+          <Field label="Study handle">
+            <Input value={handle} onChange={(e) => setHandle(e.target.value)} />
+          </Field>
 
           <Field
             label="Daily study goal (minutes)"
@@ -124,25 +119,30 @@ export function SettingsPanels() {
           >
             <Input
               value={goal}
-              onChange={(event) => setGoal(event.target.value)}
+              onChange={(e) => setGoal(e.target.value)}
               inputMode="numeric"
             />
           </Field>
 
           <Field label="Certification target">
-            <Input value={cert} onChange={(event) => setCert(event.target.value)} />
+            <Input value={cert} onChange={(e) => setCert(e.target.value)} />
           </Field>
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <Button variant="primary" onClick={saveProfile}>
               Save changes
             </Button>
-            <Button variant="ghost" onClick={discard}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setHandle(preferences.handle);
+                setGoal(String(preferences.dailyGoalMinutes));
+                setCert(preferences.certTarget);
+                toast.toast("Changes discarded", "info");
+              }}
+            >
               Discard
             </Button>
-            <span className="font-body-sm text-body-sm text-on-surface-variant">
-              Saved in this browser.
-            </span>
           </div>
         </div>
 
@@ -157,20 +157,20 @@ export function SettingsPanels() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => updateProfile({ buddy: item.id })}
-                  aria-pressed={profile.buddy === item.id}
+                  onClick={() => updatePreferences({ buddy: item.id })}
+                  aria-pressed={preferences.buddy === item.id}
                   className={cn(
-                    "flex flex-col items-center gap-1 rounded-[20px] p-3 transition-all active:scale-[0.98]",
-                    profile.buddy === item.id
+                    "flex flex-col items-center gap-1 rounded-[20px] p-2 transition-all active:scale-[0.98] sm:p-3",
+                    preferences.buddy === item.id
                       ? "bg-primary-fixed shadow-soft ring-2 ring-primary-container"
                       : "bg-surface-container-low hover:bg-surface-container-high",
                   )}
                 >
                   <BearMascot
                     variant={item.id}
-                    size={54}
+                    size={48}
                     withPlate={false}
-                    animated={profile.buddy === item.id}
+                    animated={preferences.buddy === item.id}
                   />
                   <span className="font-body-sm text-body-sm font-semibold text-on-surface">
                     {item.name}
@@ -190,16 +190,12 @@ export function SettingsPanels() {
             <Field label="Accent wash">
               <Segmented
                 options={THEMES}
-                value={profile.accent}
-                onChange={(accent) => updateProfile({ accent })}
+                value={preferences.accent}
+                onChange={(accent) => updatePreferences({ accent })}
                 label="Accent wash"
                 className="w-full"
               />
             </Field>
-            <p className="font-body-sm text-body-sm text-on-surface-variant">
-              BearNet stays light and cozy by design — no harsh dark terminal
-              themes here.
-            </p>
           </div>
 
           <div className="flex flex-col gap-space-sm rounded-[28px] bg-surface-container-lowest p-space-lg shadow-cozy">
@@ -221,9 +217,11 @@ export function SettingsPanels() {
                   </div>
                 </div>
                 <Toggle
-                  checked={profile.prefs[row.key]}
+                  checked={preferences.prefs[row.key]}
                   onChange={(next) =>
-                    updateProfile({ prefs: { ...profile.prefs, [row.key]: next } })
+                    updatePreferences({
+                      prefs: { ...preferences.prefs, [row.key]: next },
+                    })
                   }
                   label={row.title}
                 />
@@ -231,49 +229,46 @@ export function SettingsPanels() {
             ))}
           </div>
 
+          <div className="flex flex-col gap-space-sm rounded-[28px] bg-surface-container-lowest p-space-lg shadow-cozy">
+            <h2 className="font-headline-md text-[17px] font-bold text-on-surface">
+              Account
+            </h2>
+            <Button variant="secondary" onClick={() => void logout()}>
+              <LogOut className="h-4 w-4" /> Sign out
+            </Button>
+          </div>
+
           <div className="flex flex-col gap-space-sm rounded-[28px] bg-error-container/50 p-space-lg">
             <h2 className="font-headline-md text-[17px] font-bold text-on-error-container">
               Danger zone
             </h2>
             <p className="font-body-sm text-body-sm text-on-surface-variant">
-              This clears every note, all XP, streaks and scores from this
-              browser. It cannot be undone.
+              Resets XP, streaks and quiz history for this account. Your notes
+              are not touched.
             </p>
-
-            {confirmWipe ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-body-sm text-body-sm font-semibold text-on-error-container">
-                  Really erase everything?
-                </span>
-                <Button variant="secondary" onClick={() => setConfirmWipe(false)}>
-                  Keep my data
-                </Button>
-                <Button
-                  variant="danger"
-                  onClick={() => {
-                    resetToSeed();
-                    resetProgress();
-                    setConfirmWipe(false);
-                    setToast("Everything cleared — fresh start 🌱");
-                  }}
-                >
-                  Erase everything
-                </Button>
-              </div>
-            ) : (
-              <Button
-                variant="danger"
-                className="w-fit"
-                onClick={() => setConfirmWipe(true)}
-              >
-                Clear all my data
-              </Button>
-            )}
+            <Button
+              variant="danger"
+              className="w-fit"
+              onClick={() => setConfirmWipe(true)}
+            >
+              Reset my progress
+            </Button>
           </div>
         </div>
       </div>
 
-      <Toast message={toast} />
+      <ConfirmDialog
+        open={confirmWipe}
+        title="Reset all progress?"
+        description="XP, streaks, quiz and exam history will be cleared. Notes are kept."
+        confirmLabel="Reset"
+        onConfirm={() => {
+          resetProgress();
+          setConfirmWipe(false);
+          toast.success("Progress reset — fresh start 🌱");
+        }}
+        onCancel={() => setConfirmWipe(false)}
+      />
     </>
   );
 }

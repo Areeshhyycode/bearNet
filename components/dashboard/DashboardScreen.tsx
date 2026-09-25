@@ -5,20 +5,19 @@ import { ModuleCard } from "./ModuleCard";
 import { TipOfTheDay } from "./TipOfTheDay";
 import { ExamCountdown } from "./ExamCountdown";
 import { NotesModuleInset, RecentNotesSection } from "./NotesSummary";
-import { JourneyTrack } from "@/components/progress/JourneyTrack";
-import { InsetBox, Panel } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { RoadmapEditor } from "@/components/roadmap/RoadmapEditor";
+import { AIAssistant } from "@/components/roadmap/AIAssistant";
+import { InsetBox } from "@/components/ui/card";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { StatCard } from "@/components/ui/stat-card";
 import { useNotes } from "@/lib/notes-store";
 import { useProgress } from "@/lib/progress-store";
 
 export function DashboardScreen() {
-  const { notes, topics } = useNotes();
+  const { notes, categories } = useNotes();
   const {
     xp,
     level,
-    rank,
     xpIntoLevel,
     xpForNextLevel,
     streak,
@@ -30,10 +29,11 @@ export function DashboardScreen() {
     runs,
   } = useProgress();
 
-  const activeTopics = topics.filter((t) => t.noteCount > 0).length;
+  const activeShelves = categories.filter((c) => c.noteCount > 0).length;
   const mastered = topicMastery.filter((t) => t.percent >= 80).length;
   const lastRun = runs[0];
   const weakest = [...topicMastery].sort((a, b) => a.percent - b.percent)[0];
+  const publicCount = notes.filter((n) => n.visibility === "public").length;
 
   return (
     <>
@@ -56,16 +56,20 @@ export function DashboardScreen() {
         <StatCard
           emoji="🌱"
           label="Topics Mastered"
-          value={`${mastered}/${topics.length}`}
+          value={`${mastered}/${Math.max(activeShelves, 1)}`}
           caption="Above 80% accuracy"
         />
         <StatCard
           emoji="📝"
           label="Notes Saved"
           value={notes.length}
-          caption={`${activeTopics} topic${activeTopics === 1 ? "" : "s"} in use`}
+          caption={`${publicCount} shared publicly`}
         />
       </section>
+
+      {/* Roadmap + AI assistant */}
+      <RoadmapEditor />
+      <AIAssistant />
 
       {/* Core modules */}
       <section className="flex flex-col gap-space-lg">
@@ -89,25 +93,46 @@ export function DashboardScreen() {
           </ModuleCard>
 
           <ModuleCard
+            href="/community"
+            emoji="🌎"
+            bearEmoji="🐼"
+            title="Community Notes"
+            description="Read what other learners shared."
+            cta="Browse community"
+            tone="strong"
+            footnote="Only notes people deliberately marked public appear here."
+          >
+            <InsetBox className="space-y-1.5">
+              <p className="font-body-sm text-body-sm text-on-surface">
+                You have shared{" "}
+                <strong className="font-semibold">{publicCount}</strong> note
+                {publicCount === 1 ? "" : "s"} publicly.
+              </p>
+              <p className="font-body-sm text-body-sm text-on-surface-variant">
+                Switch any note to 🌎 Public to add it to the feed.
+              </p>
+            </InsetBox>
+          </ModuleCard>
+
+          <ModuleCard
             href="/tutor"
             emoji="🤖"
             bearEmoji="🐼"
             title="AI Tutor"
             description="Ask questions and learn from notes."
             cta="Chat with Panda"
-            tone="strong"
             online
-            footnote="Answers are grounded in your own notes, and Panda says which one it used."
+            footnote="Answers are grounded in your own notes."
           >
             <InsetBox className="space-y-2">
               <p className="flex items-center gap-1.5 font-body-sm text-body-sm text-on-surface">
                 <span aria-hidden>💬</span>{" "}
                 {notes.length === 0
-                  ? "Panda is online — ask anything about networking"
+                  ? "Panda is online — ask anything"
                   : `Panda can read your ${notes.length} note${notes.length === 1 ? "" : "s"}`}
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {["Explain simply", "Quiz me", "Give an example"].map((chip) => (
+                {["Explain simply", "Quiz me"].map((chip) => (
                   <span
                     key={chip}
                     className="rounded-full bg-surface-container-lowest px-2.5 py-1 font-label-badge text-label-badge text-on-surface-variant shadow-sm"
@@ -130,9 +155,7 @@ export function DashboardScreen() {
             <InsetBox className="space-y-1.5">
               <div className="flex items-center justify-between font-label-badge text-label-badge text-on-surface-variant">
                 <span>Active Recall Sprint</span>
-                <span className="font-bold text-tertiary">
-                  {quizzesCompleted} done
-                </span>
+                <span className="font-bold text-tertiary">{quizzesCompleted} done</span>
               </div>
               <p className="font-body-sm text-body-sm text-on-surface">
                 {weakest ? (
@@ -146,7 +169,7 @@ export function DashboardScreen() {
                 )}
               </p>
             </InsetBox>
-            <div className="flex items-center gap-3 pt-1 font-body-sm text-body-sm text-on-surface-variant">
+            <div className="flex flex-wrap items-center gap-3 pt-1 font-body-sm text-body-sm text-on-surface-variant">
               <span className="flex items-center gap-1">
                 <span aria-hidden>✨</span>{" "}
                 {quizAccuracy === null ? "No score yet" : `${quizAccuracy}% accuracy`}
@@ -166,17 +189,14 @@ export function DashboardScreen() {
             title="AI Exam"
             description="Exam simulated on your knowledge."
             cta={examsCompleted === 0 ? "Enter Exam Room" : "Take another exam"}
-            footnote="Answers stay hidden until the end, then you get a full breakdown."
+            footnote="Answers stay hidden until the end, then a full breakdown."
           >
             <InsetBox className="space-y-1.5">
               <div className="flex items-center justify-between font-label-badge text-label-badge text-on-surface-variant">
                 <span>Exams taken</span>
                 <span className="font-bold text-on-surface">{examsCompleted}</span>
               </div>
-              <p className="font-body-sm text-body-sm text-on-surface">
-                <strong>CompTIA Net+ style</strong>
-              </p>
-              <div className="flex items-center gap-2 font-body-sm text-body-sm text-on-surface-variant">
+              <div className="flex flex-wrap items-center gap-2 font-body-sm text-body-sm text-on-surface-variant">
                 <span>📜 5–20 questions</span>
                 <span aria-hidden>•</span>
                 <span>80% pass req</span>
@@ -192,7 +212,7 @@ export function DashboardScreen() {
             description="Hands-on networking challenges."
             cta="Launch Cyber Lab"
             tone="strong"
-            footnote="A simulated shell that answers real commands — nothing touches a live network."
+            footnote="A simulated shell that answers real commands."
           >
             <div className="space-y-1 rounded-xl bg-inverse-surface p-3 font-label-code text-label-code text-inverse-on-surface shadow-inner">
               <div className="flex items-center justify-between text-[11px] text-tertiary-fixed-dim">
@@ -202,70 +222,17 @@ export function DashboardScreen() {
               <p className="truncate text-[12px] font-medium text-surface">
                 Something is wrong with the network!
               </p>
-              <div className="flex items-center gap-2 pt-1 text-[11px] text-primary-fixed">
+              <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-primary-fixed">
                 <span className="rounded bg-primary/40 px-1.5 py-0.5">ping 8.8.8.8</span>
                 <span className="rounded bg-primary/40 px-1.5 py-0.5">traceroute</span>
               </div>
             </div>
           </ModuleCard>
-
-          <ModuleCard
-            href="/progress"
-            emoji="🌱"
-            bearEmoji="📊"
-            title="My Progress"
-            description="See mastery and areas to revise."
-            cta="View Full Journey"
-            footnote="Every number here comes from what you have actually done."
-          >
-            <InsetBox className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-label-badge text-label-badge uppercase text-on-surface-variant">
-                  Current Rank
-                </span>
-                <span className="font-body-sm text-body-sm font-bold text-on-surface">
-                  Level {level}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xl" aria-hidden>
-                  {rank.emoji}
-                </span>
-                <span className="font-headline-md text-[15px] font-bold text-on-surface">
-                  {rank.title}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-[11px] text-on-surface-variant">
-                <span>Sprout 🌱</span>
-                <span>Explorer 🎀</span>
-                <span>Defender 🌸</span>
-              </div>
-            </InsetBox>
-          </ModuleCard>
         </div>
       </section>
 
-      {/* Roadmap */}
-      <Panel className="flex flex-col gap-space-lg">
-        <div className="flex flex-col items-start justify-between gap-space-sm sm:flex-row sm:items-center">
-          <div>
-            <span className="font-label-badge text-label-badge font-bold uppercase tracking-wider text-tertiary">
-              🌷 Roadmap
-            </span>
-            <h2 className="font-headline-md text-headline-md font-bold text-on-surface">
-              Active Learning Journey
-            </h2>
-          </div>
-          <Badge tone="neutral" size="md">
-            {rank.emoji} {rank.title} · Level {level}
-          </Badge>
-        </div>
-        <JourneyTrack />
-      </Panel>
-
       <RecentNotesSection />
 
-      {/* Tip + readiness */}
       <section className="grid grid-cols-1 gap-space-lg lg:grid-cols-12">
         <TipOfTheDay />
         <ExamCountdown />
