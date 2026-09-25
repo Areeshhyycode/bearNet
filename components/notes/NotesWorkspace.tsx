@@ -5,10 +5,12 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeading } from "@/components/ui/section-heading";
-import { TopicSidebar } from "./TopicSidebar";
+import { NoteGridSkeleton } from "@/components/ui/skeleton";
+import { CategorySidebar } from "./CategorySidebar";
 import { NewNoteCard, NoteCard } from "./NoteCard";
 import { BearMascot } from "@/components/bears/BearMascot";
 import { useNotes } from "@/lib/notes-store";
+import { preview } from "@/lib/note-view";
 import { cn } from "@/lib/utils";
 
 type Filter = "all" | "private" | "public";
@@ -16,13 +18,12 @@ type Filter = "all" | "private" | "public";
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "private", label: "🔒 Private" },
-  { id: "public", label: "🌍 Public" },
+  { id: "public", label: "🌎 Public" },
 ];
 
-/** Notes dashboard: live filtering over the stored notes. */
 export function NotesWorkspace() {
-  const { notes, topics } = useNotes();
-  const [topic, setTopic] = useState("all");
+  const { notes, categories, loading, error } = useNotes();
+  const [category, setCategory] = useState("all");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -30,29 +31,23 @@ export function NotesWorkspace() {
     const needle = query.trim().toLowerCase();
 
     return notes
-      .filter((note) => (topic === "all" ? true : note.topicId === topic))
+      .filter((note) => (category === "all" ? true : note.category === category))
       .filter((note) => (filter === "all" ? true : note.visibility === filter))
       .filter((note) => {
         if (!needle) return true;
         return (
           note.title.toLowerCase().includes(needle) ||
-          note.preview.toLowerCase().includes(needle) ||
-          note.topic.toLowerCase().includes(needle) ||
+          note.content.toLowerCase().includes(needle) ||
+          note.category.toLowerCase().includes(needle) ||
           note.tags.some((tag) => tag.toLowerCase().includes(needle))
         );
-      })
-      .sort(
-        (a, b) =>
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-      );
-  }, [notes, topic, filter, query]);
-
-  const activeTopicTitle =
-    topic === "all"
-      ? "All notes"
-      : (topics.find((t) => t.id === topic)?.title ?? "All notes");
+      });
+  }, [notes, category, filter, query]);
 
   const publicCount = notes.filter((n) => n.visibility === "public").length;
+  const activeShelves = categories.filter((c) => c.noteCount > 0).length;
+  const activeTitle =
+    category === "all" ? "All notes" : category;
 
   return (
     <>
@@ -69,14 +64,14 @@ export function NotesWorkspace() {
               <span aria-hidden>🐻</span> Grizzly keeps these tidy
             </Badge>
             <Badge tone="neutral" size="md">
-              {notes.length} notes • {topics.length} topics • {publicCount} public
+              {notes.length} notes • {activeShelves} shelves • {publicCount} public
             </Badge>
           </>
         }
         actions={
           <>
-            <Button variant="outline" href="/tutor">
-              🐼 Ask Panda about a note
+            <Button variant="outline" href="/community">
+              🌎 Community notes
             </Button>
             <Button variant="primary" href="/notes/new">
               + Write a New Note
@@ -86,82 +81,89 @@ export function NotesWorkspace() {
       />
 
       <div className="grid grid-cols-1 gap-space-lg lg:grid-cols-12">
-      <TopicSidebar
-        activeTopic={topic}
-        onTopicChange={setTopic}
-        query={query}
-        onQueryChange={setQuery}
-        className="lg:col-span-3 lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto"
-      />
+        <CategorySidebar
+          activeCategory={category}
+          onCategoryChange={setCategory}
+          query={query}
+          onQueryChange={setQuery}
+          className="lg:col-span-3 lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto"
+        />
 
-      <div className="flex flex-col gap-space-lg lg:col-span-9">
-        {/* Filter row */}
-        <div className="flex flex-wrap items-center justify-between gap-space-sm rounded-full bg-surface-container-low px-space-md py-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {FILTERS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setFilter(item.id)}
-                className={cn(
-                  "rounded-full px-3 py-1 font-body-sm text-body-sm transition-colors",
-                  filter === item.id
-                    ? "bg-primary-container font-semibold text-on-primary-container shadow-sm"
-                    : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface",
-                )}
-              >
-                {item.label}
-              </button>
-            ))}
+        <div className="flex min-w-0 flex-col gap-space-lg lg:col-span-9">
+          <div className="flex flex-wrap items-center justify-between gap-space-sm rounded-[22px] bg-surface-container-low px-space-md py-2 sm:rounded-full">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {FILTERS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setFilter(item.id)}
+                  className={cn(
+                    "rounded-full px-3 py-1 font-body-sm text-body-sm transition-colors",
+                    filter === item.id
+                      ? "bg-primary-container font-semibold text-on-primary-container shadow-sm"
+                      : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface",
+                  )}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <span className="px-2 font-body-sm text-body-sm text-on-surface-variant">
+              {activeTitle} • {visible.length} note{visible.length === 1 ? "" : "s"}
+            </span>
           </div>
-          <span className="px-2 font-body-sm text-body-sm text-on-surface-variant">
-            {activeTopicTitle} • {visible.length} note
-            {visible.length === 1 ? "" : "s"} • sorted by ✨ recently updated
-          </span>
-        </div>
 
-        {notes.length === 0 ? (
-          <FirstNotePrompt />
-        ) : visible.length === 0 ? (
-          <EmptyState
-            onClear={() => {
-              setQuery("");
-              setFilter("all");
-              setTopic("all");
-            }}
-          />
-        ) : (
-          <div className="grid grid-cols-1 gap-space-lg md:grid-cols-2 2xl:grid-cols-3">
-            <NewNoteCard topicId={topic === "all" ? undefined : topic} />
-            {visible.map((note) => (
-              <NoteCard key={note.id} note={note} />
-            ))}
-          </div>
-        )}
+          {error && (
+            <div
+              role="alert"
+              className="rounded-[20px] bg-error-container px-space-md py-3 font-body-sm text-body-sm text-on-error-container"
+            >
+              🥺 {error}
+            </div>
+          )}
+
+          {loading ? (
+            <NoteGridSkeleton />
+          ) : notes.length === 0 ? (
+            <FirstNotePrompt />
+          ) : visible.length === 0 ? (
+            <EmptyState
+              onClear={() => {
+                setQuery("");
+                setFilter("all");
+                setCategory("all");
+              }}
+            />
+          ) : (
+            <div className="grid grid-cols-1 gap-space-lg md:grid-cols-2 2xl:grid-cols-3">
+              <NewNoteCard category={category} />
+              {visible.map((note) => (
+                <NoteCard key={note.id} note={note} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </>
   );
 }
 
-/** Shown the very first time, before a single note exists. */
 function FirstNotePrompt() {
   return (
-    <div className="flex flex-col items-center gap-space-md rounded-[28px] bg-surface-container-lowest p-space-xl text-center shadow-cozy">
+    <div className="flex flex-col items-center gap-space-md rounded-[28px] bg-surface-container-lowest p-space-lg text-center shadow-cozy sm:p-space-xl">
       <div className="flex items-end gap-2">
-        <BearMascot variant="grizzly" size={92} animated />
-        <BearMascot variant="panda" size={72} withPlate={false} />
-        <BearMascot variant="polar" size={72} withPlate={false} />
+        <BearMascot variant="grizzly" size={78} animated />
+        <BearMascot variant="panda" size={62} withPlate={false} />
+        <BearMascot variant="polar" size={62} withPlate={false} />
       </div>
 
       <div className="space-y-1">
-        <h3 className="font-headline-lg text-headline-lg font-bold text-on-surface">
+        <h3 className="font-headline-md text-headline-md font-bold text-on-surface sm:font-headline-lg sm:text-headline-lg">
           🎀 Your notebook is brand new
         </h3>
         <p className="mx-auto max-w-md font-body-md text-body-md text-on-surface-variant">
           Nothing here yet — and that is exactly right. Write what you learned
-          today and the bears take it from there: Panda tutors from it, quizzes
-          are built from it, and your progress grows with it.
+          today and the bears take it from there.
         </p>
       </div>
 
@@ -192,26 +194,23 @@ function FirstNotePrompt() {
         <Button variant="primary" size="lg" href="/notes/new">
           ✏️ Write my first note
         </Button>
-        <Button variant="outline" href="/tutor">
-          🐼 Ask Panda instead
+        <Button variant="outline" href="/community">
+          🌎 Browse community notes
         </Button>
       </div>
-
-      <Badge tone="outline">Saved in this browser · nothing is uploaded</Badge>
     </div>
   );
 }
 
 function EmptyState({ onClear }: { onClear: () => void }) {
   return (
-    <div className="flex flex-col items-center gap-space-md rounded-[28px] bg-surface-container-lowest p-space-xl text-center shadow-cozy">
-      <BearMascot variant="polar" size={110} animated />
+    <div className="flex flex-col items-center gap-space-md rounded-[28px] bg-surface-container-lowest p-space-lg text-center shadow-cozy sm:p-space-xl">
+      <BearMascot variant="polar" size={96} animated />
       <h3 className="font-headline-md text-[17px] font-bold text-on-surface">
         Nothing matches that yet
       </h3>
       <p className="max-w-sm font-body-md text-body-md text-on-surface-variant">
-        Polar searched every shelf and came back empty-pawed. Try a different
-        topic, or write this one yourself.
+        Polar searched every shelf and came back empty-pawed.
       </p>
       <div className="flex flex-wrap justify-center gap-2">
         <Button variant="secondary" onClick={onClear}>
@@ -227,7 +226,8 @@ function EmptyState({ onClear }: { onClear: () => void }) {
       >
         or ask Panda about it
       </Link>
-      <Badge tone="outline">Saved locally in this browser</Badge>
     </div>
   );
 }
+
+export { preview };

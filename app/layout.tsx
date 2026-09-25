@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { AppShell } from "@/components/layout/AppShell";
-import { NotesProvider } from "@/lib/notes-store";
-import { ProgressProvider } from "@/lib/progress-store";
+import { getSession } from "@/lib/auth/guard";
+import { findUserById } from "@/lib/db/users";
+import { Providers } from "@/components/layout/Providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,22 +17,23 @@ export const viewport: Viewport = {
   themeColor: "#fff8f7",
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Resolved on the server so the first paint already knows who is signed in.
+  const session = await getSession();
+  const user = session ? await findUserById(session.userId).catch(() => null) : null;
+
   return (
     <html lang="en">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin=""
-        />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         {/* App Router loads this once for the whole app, so the
             pages/_document warning this rule targets does not apply.
             A plain <link> also degrades gracefully when offline,
@@ -44,11 +45,7 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-surface font-body-md text-body-md text-on-surface antialiased">
-        <ProgressProvider>
-          <NotesProvider>
-            <AppShell>{children}</AppShell>
-          </NotesProvider>
-        </ProgressProvider>
+        <Providers initialUser={user}>{children}</Providers>
       </body>
     </html>
   );

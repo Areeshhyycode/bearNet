@@ -1,48 +1,12 @@
 /**
- * Static content only — shelf structure, copy and scenario scripts.
+ * Static content only — module copy, journey ranks, badge definitions,
+ * lab scenarios and daily tips.
  *
- * Anything that reflects the learner (notes, XP, streak, scores, mastery)
- * lives in `notes-store.tsx` and `progress-store.tsx` and starts empty.
+ * Notes, categories, XP and progress all live in MongoDB now; see
+ * `lib/db/` and the client stores in `lib/*-store.tsx`.
  */
 
 export type BearId = "grizzly" | "panda" | "polar";
-
-export type NoteTopic = {
-  id: string;
-  title: string;
-  emoji: string;
-  noteCount: number;
-};
-
-export type Note = {
-  id: string;
-  title: string;
-  topicId: string;
-  topic: string;
-  emoji: string;
-  preview: string;
-  body: string[];
-  updatedAt: string;
-  visibility: "private" | "public";
-  tags: string[];
-  readMinutes: number;
-};
-
-/** The starting shelves. The learner can add and remove these. */
-export const NOTE_TOPICS: NoteTopic[] = [
-  { id: "basics", title: "Networking Basics", emoji: "📘", noteCount: 0 },
-  { id: "ip-address", title: "IP Address", emoji: "📘", noteCount: 0 },
-  { id: "mac-address", title: "MAC Address", emoji: "📘", noteCount: 0 },
-  { id: "osi-model", title: "OSI Model", emoji: "📘", noteCount: 0 },
-  { id: "tcp-ip", title: "TCP/IP", emoji: "📘", noteCount: 0 },
-  { id: "dns", title: "DNS", emoji: "📘", noteCount: 0 },
-  { id: "dhcp", title: "DHCP", emoji: "📘", noteCount: 0 },
-  { id: "ports", title: "Ports", emoji: "📘", noteCount: 0 },
-  { id: "subnetting", title: "Subnetting", emoji: "📘", noteCount: 0 },
-];
-
-/** No demo notes — the notebook starts empty and fills with real writing. */
-export const NOTES: Note[] = [];
 
 /* -------------------------------- Dashboard ------------------------------- */
 
