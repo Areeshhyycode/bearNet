@@ -14,9 +14,9 @@ export const metadata: Metadata = {
 export default async function NewNotePage({
   searchParams,
 }: {
-  searchParams: Promise<{ topic?: string }>;
+  searchParams: Promise<{ category?: string }>;
 }) {
-  const { topic } = await searchParams;
+  const { category } = await searchParams;
 
   return (
     <PageContainer>
@@ -41,14 +41,14 @@ export default async function NewNotePage({
                 <span aria-hidden>🎀</span> New note
               </Badge>
               <Badge tone="outline" size="md">
-                Saves to this browser
+                Saved to your account
               </Badge>
             </>
           }
         />
       </div>
 
-      <NoteEditor initialTopicId={topic} />
+      <NoteEditor initialCategory={category} />
     </PageContainer>
   );
 }
