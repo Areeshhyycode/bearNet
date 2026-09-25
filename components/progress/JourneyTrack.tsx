@@ -1,19 +1,52 @@
+"use client";
+
 import { JOURNEY } from "@/lib/mock-data";
+import { useProgress } from "@/lib/progress-store";
 import { cn } from "@/lib/utils";
 
-/** Horizontal roadmap rail — five cozy ranks from Sprout to VAPT. */
-export function JourneyTrack({ fillPercent = 36 }: { fillPercent?: number }) {
+type StageState = "completed" | "current" | "locked";
+
+/** Works out where the learner sits on the five-rank ladder. */
+function useStages() {
+  const { level, rank, levelPercent } = useProgress();
+
+  return JOURNEY.map((stage) => {
+    let state: StageState = "locked";
+    if (stage.id === rank.id) state = "current";
+    else if (level >= stage.minLevel) state = "completed";
+
+    const caption =
+      state === "completed"
+        ? "Completed ✓"
+        : state === "current"
+          ? `Current (${levelPercent}%)`
+          : stage.id === "vapt"
+            ? "Final Goal"
+            : `Unlocks at level ${stage.minLevel}`;
+
+    return { ...stage, state, caption };
+  });
+}
+
+/** Horizontal roadmap rail. */
+export function JourneyTrack() {
+  const stages = useStages();
+  const reached = stages.filter((s) => s.state !== "locked").length;
+  const fillPercent = Math.max(
+    0,
+    Math.min(100, ((reached - 1) / (stages.length - 1)) * 100),
+  );
+
   return (
     <div className="w-full overflow-x-auto py-4 no-scrollbar">
       <div className="relative flex min-w-[720px] items-center justify-between">
-        {/* Connector rails */}
         <div className="absolute left-6 right-6 top-1/2 z-0 h-1 -translate-y-1/2 rounded-full bg-surface-container" />
         <div
           className="absolute left-6 top-1/2 z-0 h-1 -translate-y-1/2 rounded-full bg-primary transition-all duration-700"
-          style={{ width: `${fillPercent}%` }}
+          style={{ width: `calc(${fillPercent}% - 24px)` }}
         />
 
-        {JOURNEY.map((stage) => (
+        {stages.map((stage) => (
           <div
             key={stage.id}
             className={cn(
@@ -24,8 +57,7 @@ export function JourneyTrack({ fillPercent = 36 }: { fillPercent?: number }) {
             <div
               className={cn(
                 "flex h-12 w-12 items-center justify-center rounded-full text-xl transition-transform hover:scale-105",
-                stage.state === "completed" &&
-                  "bg-primary text-on-primary shadow-sm",
+                stage.state === "completed" && "bg-primary text-on-primary shadow-sm",
                 stage.state === "current" &&
                   "bg-primary-container text-on-primary-container shadow-md ring-4 ring-primary-fixed",
                 stage.state === "locked" &&
@@ -61,11 +93,12 @@ export function JourneyTrack({ fillPercent = 36 }: { fillPercent?: number }) {
 
 /** Vertical variant used on the Progress page. */
 export function JourneyLadder() {
+  const stages = useStages();
+
   return (
     <ol className="flex flex-col">
-      {JOURNEY.map((stage, index) => (
+      {stages.map((stage, index) => (
         <li key={stage.id} className="flex gap-space-md">
-          {/* Rail */}
           <div className="flex flex-col items-center">
             <div
               className={cn(
@@ -80,7 +113,7 @@ export function JourneyLadder() {
             >
               {stage.emoji}
             </div>
-            {index < JOURNEY.length - 1 && (
+            {index < stages.length - 1 && (
               <div
                 className={cn(
                   "my-1 w-1 flex-1 rounded-full",
@@ -92,7 +125,6 @@ export function JourneyLadder() {
             )}
           </div>
 
-          {/* Copy */}
           <div
             className={cn(
               "mb-space-md flex-1 rounded-[20px] p-space-md transition-colors",

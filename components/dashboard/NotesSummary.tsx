@@ -6,7 +6,6 @@ import { ArrowRight } from "lucide-react";
 import { Badge, VisibilityBadge } from "@/components/ui/badge";
 import { InsetBox } from "@/components/ui/card";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { StatCard } from "@/components/ui/stat-card";
 import { useNotes } from "@/lib/notes-store";
 import { formatRelative } from "@/lib/utils";
 
@@ -22,21 +21,6 @@ function useRecentNotes(count = 4) {
         )
         .slice(0, count),
     [notes, count],
-  );
-}
-
-/** Live "Notes Saved" tile for the dashboard stat row. */
-export function NotesCountStat() {
-  const { notes, topics } = useNotes();
-  const activeTopics = topics.filter((t) => t.noteCount > 0).length;
-
-  return (
-    <StatCard
-      emoji="📝"
-      label="Notes Saved"
-      value={notes.length}
-      caption={`${activeTopics} topic${activeTopics === 1 ? "" : "s"} in use`}
-    />
   );
 }
 

@@ -2,15 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import { RotateCcw, Timer } from "lucide-react";
+import { useProgress } from "@/lib/progress-store";
 import { cn } from "@/lib/utils";
 
 const FOCUS_SECONDS = 25 * 60;
 
 /** Cozy study timer — the one bit of interactivity on the hub. */
 export function PomodoroTimer() {
+  const { recordStudyMinutes } = useProgress();
   const [secondsLeft, setSecondsLeft] = useState(FOCUS_SECONDS);
   const [running, setRunning] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** Whole minutes already banked this session, so we never double count. */
+  const bankedRef = useRef(0);
 
   useEffect(() => {
     if (!running) return;
@@ -21,6 +25,15 @@ export function PomodoroTimer() {
           setRunning(false);
           return 0;
         }
+
+        // Bank each completed minute as real study time.
+        const elapsed = FOCUS_SECONDS - (prev - 1);
+        const whole = Math.floor(elapsed / 60);
+        if (whole > bankedRef.current) {
+          recordStudyMinutes(whole - bankedRef.current);
+          bankedRef.current = whole;
+        }
+
         return prev - 1;
       });
     }, 1000);
@@ -28,7 +41,7 @@ export function PomodoroTimer() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [running]);
+  }, [running, recordStudyMinutes]);
 
   const mins = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
   const secs = String(secondsLeft % 60).padStart(2, "0");
@@ -80,5 +93,6 @@ export function PomodoroTimer() {
   function reset() {
     setRunning(false);
     setSecondsLeft(FOCUS_SECONDS);
+    bankedRef.current = 0;
   }
 }

@@ -1,6 +1,14 @@
 import { BearMascot } from "@/components/bears/BearMascot";
-import type { ChatMessage } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
+
+export type ChatMessage = {
+  id: string;
+  role: "user" | "bear";
+  text: string;
+  time: string;
+  sources?: string[];
+};
+
 
 /** One message in the tutor conversation. */
 export function ChatBubble({ message }: { message: ChatMessage }) {
@@ -22,7 +30,7 @@ export function ChatBubble({ message }: { message: ChatMessage }) {
       <div className={cn("flex max-w-[78%] flex-col gap-1", !isBear && "items-end")}>
         <div
           className={cn(
-            "px-space-md py-3 font-body-md text-body-md leading-relaxed shadow-sm",
+            "whitespace-pre-wrap px-space-md py-3 font-body-md text-body-md leading-relaxed shadow-sm",
             isBear
               ? "rounded-2xl rounded-bl-sm bg-surface-container-lowest text-on-surface"
               : "rounded-2xl rounded-br-sm bg-primary-container text-on-primary-container",

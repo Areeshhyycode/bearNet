@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Menu, Settings, X } from "lucide-react";
 import { BearLogo } from "@/components/bears/BearLogo";
 import { NAV_ITEMS, isActivePath } from "@/lib/nav";
-import { LEARNER } from "@/lib/mock-data";
+import { useProgress } from "@/lib/progress-store";
 import { cn } from "@/lib/utils";
 
 /**
@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 export function Topbar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const { streak, xp, profile } = useProgress();
 
   const primaryItems = NAV_ITEMS.filter((item) => item.href !== "/settings");
 
@@ -65,15 +66,13 @@ export function Topbar() {
               <span className="text-tertiary" aria-hidden>
                 🔥
               </span>
-              <span className="font-medium">{LEARNER.streak} Day Streak</span>
+              <span className="font-medium">{streak} Day Streak</span>
             </div>
             <div className="hidden items-center gap-1.5 rounded-full bg-secondary-fixed px-3 py-1 font-body-sm text-body-sm text-on-secondary-fixed sm:flex">
               <span className="text-secondary" aria-hidden>
                 🎀
               </span>
-              <span className="font-medium">
-                {LEARNER.xp.toLocaleString()} XP
-              </span>
+              <span className="font-medium">{xp.toLocaleString()} XP</span>
             </div>
 
             <Link
@@ -100,7 +99,7 @@ export function Topbar() {
             </button>
 
             <div className="hidden h-8 w-8 items-center justify-center rounded-full bg-primary font-label-badge text-label-badge text-on-primary xl:flex">
-              {LEARNER.name.slice(0, 1)}
+              {profile.name.slice(0, 1).toUpperCase()}
             </div>
           </div>
         </div>

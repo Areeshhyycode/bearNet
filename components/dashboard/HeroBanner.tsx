@@ -1,18 +1,52 @@
+"use client";
+
+import Link from "next/link";
 import { BearStudyScene } from "@/components/bears/BearStudyScene";
 import { ProgressBar } from "@/components/ui/progress";
-import { TODAY_CHALLENGE } from "@/lib/mock-data";
+import { useNotes } from "@/lib/notes-store";
+import { useProgress } from "@/lib/progress-store";
 import { PomodoroTimer } from "./PomodoroTimer";
 
-/** Welcome banner: greeting, today's focus goal and the bear study scene. */
+/** Welcome banner: greeting, today's focus and the bear study scene. */
 export function HeroBanner() {
+  const { notes } = useNotes();
+  const { profile, weeklyActivity, topicMastery, streak, rank } = useProgress();
+
+  const todayMinutes = weeklyActivity[weeklyActivity.length - 1]?.minutes ?? 0;
+  const goal = profile.dailyGoalMinutes;
+  const percent = Math.min(100, Math.round((todayMinutes / goal) * 100));
+
+  const weakest = [...topicMastery].sort((a, b) => a.percent - b.percent)[0];
+
+  /** The focus goal follows whatever the learner actually needs next. */
+  const focus =
+    notes.length === 0
+      ? {
+          emoji: "✏️",
+          title: "Write your first note",
+          href: "/notes/new",
+          milestone: "Unlock personalised quizzes",
+        }
+      : weakest && weakest.percent < 80
+        ? {
+            emoji: "🎯",
+            title: `Revise ${weakest.topic} — ${weakest.percent}% so far`,
+            href: "/quiz",
+            milestone: `Get ${weakest.topic} above 80%`,
+          }
+        : {
+            emoji: "🎓",
+            title: "Take a full exam run",
+            href: "/exam",
+            milestone: `Next rank after ${rank.title}`,
+          };
+
   return (
     <section className="relative w-full overflow-hidden rounded-[28px] bg-surface-container-low p-space-md shadow-hero sm:p-space-xl">
-      {/* Ambient blush glow */}
       <div className="pointer-events-none absolute -right-16 -top-16 h-80 w-80 rounded-full bg-primary-container/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-20 -left-12 h-72 w-72 rounded-full bg-secondary-container/30 blur-3xl" />
 
       <div className="relative z-10 grid grid-cols-1 items-center gap-space-lg lg:grid-cols-12">
-        {/* Text & status */}
         <div className="flex flex-col gap-space-md lg:col-span-6">
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-highest px-3 py-1 font-label-badge text-label-badge uppercase tracking-wider text-on-surface">
@@ -32,9 +66,9 @@ export function HeroBanner() {
               <span aria-hidden>🎀</span> My Learning Hub
             </h1>
             <p className="max-w-xl font-body-lg text-body-lg text-on-surface-variant">
-              Welcome back to your cozy cyber sanctuary. Polar, Panda and
-              Grizzly have prepared your notes, packet labs and daily protocol
-              review.
+              {notes.length === 0
+                ? "Welcome to your cozy cyber sanctuary. Grizzly, Panda and Polar are ready — start by writing down one thing you learned."
+                : `Welcome back${streak > 1 ? `, ${streak} days running` : ""}. Polar, Panda and Grizzly have your notes, packet labs and daily review ready.`}
             </p>
           </div>
 
@@ -43,32 +77,31 @@ export function HeroBanner() {
             <div className="flex flex-wrap items-center justify-between gap-space-sm">
               <div className="flex items-center gap-2">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-fixed font-body-sm text-body-sm text-on-primary-fixed">
-                  {TODAY_CHALLENGE.emoji}
+                  {focus.emoji}
                 </span>
                 <div>
                   <div className="font-body-sm text-body-sm font-semibold uppercase tracking-wider text-on-surface-variant">
                     Today&apos;s Focus Goal
                   </div>
-                  <div className="font-headline-md text-[16px] font-semibold text-on-surface">
-                    {TODAY_CHALLENGE.title}
-                  </div>
+                  <Link
+                    href={focus.href}
+                    className="font-headline-md text-[16px] font-semibold text-on-surface transition-colors hover:text-primary"
+                  >
+                    {focus.title}
+                  </Link>
                 </div>
               </div>
               <div className="flex items-center gap-1.5 rounded-full bg-surface-container-high px-3 py-1 font-label-code text-label-code text-on-surface">
-                <span aria-hidden>⏱️</span> {TODAY_CHALLENGE.percent}% Completed
+                <span aria-hidden>⏱️</span> {todayMinutes}/{goal} min today
               </div>
             </div>
 
-            <ProgressBar
-              value={TODAY_CHALLENGE.percent}
-              label="Today's focus goal progress"
-            />
+            <ProgressBar value={percent} label="Today's study goal" />
 
             <div className="flex flex-wrap items-center justify-between gap-space-sm pt-1">
               <PomodoroTimer />
               <span className="flex items-center gap-1 font-body-sm text-body-sm text-on-surface-variant">
-                <span aria-hidden>🌸</span> Next milestone:{" "}
-                {TODAY_CHALLENGE.nextMilestone}
+                <span aria-hidden>🌸</span> Next: {focus.milestone}
               </span>
             </div>
           </div>
@@ -83,11 +116,11 @@ export function HeroBanner() {
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-tertiary" />
                   <span className="font-body-sm text-body-sm font-medium">
-                    Bears Study Lab: Active Room #04
+                    Bears Study Lab · {rank.emoji} {rank.title}
                   </span>
                 </div>
                 <span className="hidden font-label-code text-label-code text-on-surface-variant sm:inline">
-                  3 Peers Online
+                  {notes.length} note{notes.length === 1 ? "" : "s"}
                 </span>
               </div>
             </div>

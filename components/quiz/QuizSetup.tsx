@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Segmented } from "@/components/ui/segmented";
+import { useNotes } from "@/lib/notes-store";
 import { QUIZ_TOPIC_CHOICES } from "@/lib/mock-data";
+import type { Difficulty } from "@/lib/quiz-types";
 import { cn } from "@/lib/utils";
 
-const DIFFICULTIES = [
+const DIFFICULTIES: { value: Difficulty; label: string; emoji: string }[] = [
   { value: "easy", label: "Easy", emoji: "🌱" },
   { value: "medium", label: "Medium", emoji: "🎀" },
   { value: "hard", label: "Hard", emoji: "🔥" },
@@ -19,20 +22,38 @@ const COUNTS = [
   { value: 20, label: "20" },
 ];
 
-/**
- * Topic / difficulty / length picker.
- * Selection is visual state only — nothing is generated yet.
- */
+/** Topic / difficulty / length picker that hands a config to the session. */
 export function QuizSetup({
   title = "Pick your drill",
   ctaLabel = "Start Quiz",
+  defaultCount = 5,
+  onStart,
 }: {
   title?: string;
   ctaLabel?: string;
+  defaultCount?: number;
+  onStart: (config: { topic: string; difficulty: Difficulty; count: number }) => void;
 }) {
+  const { notes } = useNotes();
   const [topic, setTopic] = useState("mixed");
-  const [difficulty, setDifficulty] = useState("medium");
-  const [count, setCount] = useState(10);
+  const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [count, setCount] = useState(defaultCount);
+
+  /** Offer the learner's own topics first, then the standard ones. */
+  const choices = useMemo(() => {
+    const fromNotes = [...new Set(notes.map((note) => note.topic))].map(
+      (name) => ({
+        id: name,
+        emoji: "📗",
+        title: name,
+        caption: `${notes.filter((n) => n.topic === name).length} of your notes`,
+      }),
+    );
+
+    const seen = new Set(fromNotes.map((c) => c.id));
+    const rest = QUIZ_TOPIC_CHOICES.filter((c) => !seen.has(c.id));
+    return [QUIZ_TOPIC_CHOICES[0], ...fromNotes, ...rest.slice(1)];
+  }, [notes]);
 
   return (
     <Card className="flex flex-col gap-space-lg p-space-md sm:p-space-xl">
@@ -40,9 +61,16 @@ export function QuizSetup({
         <h2 className="font-headline-md text-headline-md font-bold text-on-surface">
           {title}
         </h2>
-        <span className="rounded-full bg-surface-container-low px-3 py-1 font-body-sm text-body-sm text-on-surface-variant">
-          Est. {Math.round(count * 0.8)} min
-        </span>
+        <div className="flex items-center gap-2">
+          <Badge tone={notes.length > 0 ? "mint" : "outline"}>
+            {notes.length > 0
+              ? `🐼 built from your ${notes.length} note${notes.length === 1 ? "" : "s"}`
+              : "🐼 no notes yet — using Network+ basics"}
+          </Badge>
+          <span className="rounded-full bg-surface-container-low px-3 py-1 font-body-sm text-body-sm text-on-surface-variant">
+            Est. {Math.max(1, Math.round(count * 0.8))} min
+          </span>
+        </div>
       </div>
 
       {/* Topics */}
@@ -51,7 +79,7 @@ export function QuizSetup({
           Choose a topic
         </span>
         <div className="grid grid-cols-2 gap-space-sm md:grid-cols-3">
-          {QUIZ_TOPIC_CHOICES.map((choice) => {
+          {choices.map((choice) => {
             const selected = topic === choice.id;
             return (
               <button
@@ -112,9 +140,15 @@ export function QuizSetup({
 
       <div className="flex flex-wrap items-center justify-between gap-space-sm border-t border-outline-variant/40 pt-space-md">
         <p className="font-body-sm text-body-sm text-on-surface-variant">
-          🐼 Panda will build this from your notes once the engine is wired up.
+          {notes.length > 0
+            ? "🐼 Questions are generated from your own notes."
+            : "🌸 Write a few notes and these become personal to you."}
         </p>
-        <Button variant="primary" size="lg">
+        <Button
+          variant="primary"
+          size="lg"
+          onClick={() => onStart({ topic, difficulty, count })}
+        >
           {ctaLabel} 🎀
         </Button>
       </div>

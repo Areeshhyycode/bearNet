@@ -1,13 +1,34 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { SCHEDULED_EXAM } from "@/lib/mock-data";
+import { useProgress } from "@/lib/progress-store";
 
-/** Certification countdown widget. */
+/** Certification readiness, measured from real exam runs. */
 export function ExamCountdown() {
+  const { profile, runs, examsCompleted, quizAccuracy, streak } = useProgress();
+
+  const examRuns = runs.filter((run) => run.mode === "exam");
+  const readiness =
+    examRuns.length === 0
+      ? null
+      : Math.round(
+          examRuns.slice(0, 5).reduce((sum, r) => sum + r.percent, 0) /
+            Math.min(5, examRuns.length),
+        );
+
   const cells = [
-    { value: SCHEDULED_EXAM.daysLeft, label: "Days", accent: false },
-    { value: SCHEDULED_EXAM.hoursLeft, label: "Hours", accent: false },
-    { value: `${SCHEDULED_EXAM.prepared}%`, label: "Prepared", accent: true },
+    { value: examsCompleted, label: "Exams", accent: false },
+    {
+      value: quizAccuracy === null ? "—" : `${quizAccuracy}%`,
+      label: "Accuracy",
+      accent: false,
+    },
+    {
+      value: readiness === null ? "—" : `${readiness}%`,
+      label: "Ready",
+      accent: true,
+    },
   ];
 
   return (
@@ -15,15 +36,19 @@ export function ExamCountdown() {
       <div className="space-y-1">
         <div className="flex items-center justify-between gap-2">
           <span className="font-label-badge text-label-badge font-semibold uppercase tracking-wider text-on-surface-variant">
-            Scheduled Exam
+            Certification target
           </span>
-          <Badge tone="lavender">{SCHEDULED_EXAM.daysLeft} Days Left</Badge>
+          <Badge tone="lavender">🔥 {streak}d streak</Badge>
         </div>
         <h3 className="font-headline-md text-[18px] font-bold text-on-surface">
-          {SCHEDULED_EXAM.title}
+          {profile.certTarget}
         </h3>
         <p className="font-body-sm text-body-sm text-on-surface-variant">
-          Recommended study pace: {SCHEDULED_EXAM.pace}
+          {readiness === null
+            ? "Take a full exam run and Panda can estimate how ready you are."
+            : readiness >= 80
+              ? "You are sitting above the pass mark. Keep it steady. 🌸"
+              : `${80 - readiness}% below the pass mark — a couple more runs should close it.`}
         </p>
       </div>
 
@@ -47,8 +72,8 @@ export function ExamCountdown() {
         ))}
       </div>
 
-      <Button variant="secondary" block>
-        Review Schedule Calendar
+      <Button variant="secondary" block href="/exam">
+        {examsCompleted === 0 ? "Take my first exam" : "Enter the exam room"}
       </Button>
     </div>
   );

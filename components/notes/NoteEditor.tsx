@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/field";
 import { Toast } from "@/components/ui/toast";
 import { BearMascot } from "@/components/bears/BearMascot";
 import { useNotes } from "@/lib/notes-store";
+import { XP, useProgress } from "@/lib/progress-store";
 import type { Note } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +63,7 @@ export function NoteEditor({
 }) {
   const router = useRouter();
   const { topics, saveNote, deleteNote } = useNotes();
+  const { recordNoteSaved } = useProgress();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [title, setTitle] = useState(note?.title ?? "");
@@ -111,11 +113,14 @@ export function NoteEditor({
     });
 
     setDirty(false);
-    setToast(`🎀 Saved · ${new Date().toLocaleTimeString()}`);
 
-    // A brand-new note gets its own URL so refreshing keeps working.
-    if (!note?.id && id) {
-      setTimeout(() => router.replace(`/notes/${id}`), 400);
+    // XP is awarded for writing a note, not for re-saving the same one.
+    if (!note?.id) {
+      recordNoteSaved();
+      setToast(`🎀 Note saved · +${XP.noteSaved} XP`);
+      if (id) setTimeout(() => router.replace(`/notes/${id}`), 500);
+    } else {
+      setToast(`🎀 Saved · ${new Date().toLocaleTimeString()}`);
     }
   }
 
@@ -139,6 +144,27 @@ export function NoteEditor({
             placeholder="Give this note a name…"
             className="border-0 bg-transparent px-0 font-headline-lg text-headline-lg font-bold text-on-surface ring-0 placeholder:text-on-surface-variant/50 focus:ring-0"
           />
+
+          {/* Topic lives here now — one compact control instead of a chip wall. */}
+          <label className="flex w-fit items-center gap-2 rounded-full bg-surface-container-low py-1.5 pl-3 pr-1.5">
+            <span className="font-label-badge text-label-badge font-semibold uppercase tracking-wider text-on-surface-variant">
+              Topic
+            </span>
+            <select
+              value={topic}
+              onChange={(event) => {
+                setTopic(event.target.value);
+                setDirty(true);
+              }}
+              className="cursor-pointer rounded-full bg-surface-container-lowest px-3 py-1 font-body-sm text-body-sm font-semibold text-on-surface outline-none ring-1 ring-inset ring-transparent transition-all focus:ring-primary-container"
+            >
+              {topics.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.title}
+                </option>
+              ))}
+            </select>
+          </label>
 
           {/* Toolbar */}
           <div className="flex flex-wrap items-center gap-1 rounded-full bg-surface-container-low p-1.5">
@@ -226,32 +252,6 @@ export function NoteEditor({
                   </span>
                 </button>
               ))}
-            </div>
-
-            <div className="space-y-1.5">
-              <span className="font-label-badge text-label-badge font-semibold uppercase tracking-wider text-on-surface-variant">
-                Topic
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {topics.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => {
-                      setTopic(option.id);
-                      setDirty(true);
-                    }}
-                    className={cn(
-                      "rounded-full px-2.5 py-1 font-label-badge text-label-badge transition-all",
-                      topic === option.id
-                        ? "bg-primary text-on-primary shadow-sm"
-                        : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface",
-                    )}
-                  >
-                    {option.title}
-                  </button>
-                ))}
-              </div>
             </div>
 
             <div className="flex flex-col gap-2 pt-1">

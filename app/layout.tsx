@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { AppShell } from "@/components/layout/AppShell";
 import { NotesProvider } from "@/lib/notes-store";
+import { ProgressProvider } from "@/lib/progress-store";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -43,9 +44,11 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-surface font-body-md text-body-md text-on-surface antialiased">
-        <NotesProvider>
-          <AppShell>{children}</AppShell>
-        </NotesProvider>
+        <ProgressProvider>
+          <NotesProvider>
+            <AppShell>{children}</AppShell>
+          </NotesProvider>
+        </ProgressProvider>
       </body>
     </html>
   );

@@ -120,7 +120,9 @@ export function NotesWorkspace() {
           </span>
         </div>
 
-        {visible.length === 0 && (query || filter !== "all" || topic !== "all") ? (
+        {notes.length === 0 ? (
+          <FirstNotePrompt />
+        ) : visible.length === 0 ? (
           <EmptyState
             onClear={() => {
               setQuery("");
@@ -139,6 +141,64 @@ export function NotesWorkspace() {
         </div>
       </div>
     </>
+  );
+}
+
+/** Shown the very first time, before a single note exists. */
+function FirstNotePrompt() {
+  return (
+    <div className="flex flex-col items-center gap-space-md rounded-[28px] bg-surface-container-lowest p-space-xl text-center shadow-cozy">
+      <div className="flex items-end gap-2">
+        <BearMascot variant="grizzly" size={92} animated />
+        <BearMascot variant="panda" size={72} withPlate={false} />
+        <BearMascot variant="polar" size={72} withPlate={false} />
+      </div>
+
+      <div className="space-y-1">
+        <h3 className="font-headline-lg text-headline-lg font-bold text-on-surface">
+          🎀 Your notebook is brand new
+        </h3>
+        <p className="mx-auto max-w-md font-body-md text-body-md text-on-surface-variant">
+          Nothing here yet — and that is exactly right. Write what you learned
+          today and the bears take it from there: Panda tutors from it, quizzes
+          are built from it, and your progress grows with it.
+        </p>
+      </div>
+
+      <div className="grid w-full max-w-lg grid-cols-1 gap-2 pt-1 sm:grid-cols-3">
+        {[
+          { emoji: "✍️", title: "Write", caption: "One thing you learned" },
+          { emoji: "🐼", title: "Ask", caption: "Panda explains it back" },
+          { emoji: "🧠", title: "Test", caption: "Quiz built from it" },
+        ].map((step, index) => (
+          <div
+            key={step.title}
+            className="flex flex-col items-center gap-0.5 rounded-[20px] bg-surface-container-low p-space-md"
+          >
+            <span className="text-xl" aria-hidden>
+              {step.emoji}
+            </span>
+            <span className="font-body-md text-body-md font-semibold text-on-surface">
+              {index + 1}. {step.title}
+            </span>
+            <span className="font-body-sm text-body-sm text-on-surface-variant">
+              {step.caption}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap justify-center gap-2 pt-1">
+        <Button variant="primary" size="lg" href="/notes/new">
+          ✏️ Write my first note
+        </Button>
+        <Button variant="outline" href="/tutor">
+          🐼 Ask Panda instead
+        </Button>
+      </div>
+
+      <Badge tone="outline">Saved in this browser · nothing is uploaded</Badge>
+    </div>
   );
 }
 
