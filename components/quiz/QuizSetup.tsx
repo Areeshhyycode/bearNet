@@ -41,12 +41,12 @@ export function QuizSetup({
 
   /** Offer the learner's own topics first, then the standard ones. */
   const choices = useMemo(() => {
-    const fromNotes = [...new Set(notes.map((note) => note.topic))].map(
+    const fromNotes = [...new Set(notes.map((note) => note.category))].map(
       (name) => ({
         id: name,
         emoji: "📗",
         title: name,
-        caption: `${notes.filter((n) => n.topic === name).length} of your notes`,
+        caption: `${notes.filter((n) => n.category === name).length} of your notes`,
       }),
     );
 

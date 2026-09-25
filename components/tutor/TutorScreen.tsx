@@ -21,7 +21,7 @@ const SUGGESTIONS_EMPTY = [
 ];
 
 export function TutorScreen() {
-  const { notes, topics } = useNotes();
+  const { notes, categories } = useNotes();
 
   const recent = useMemo(
     () =>
@@ -34,7 +34,7 @@ export function TutorScreen() {
     [notes],
   );
 
-  const activeTopics = topics.filter((t) => t.noteCount > 0).length;
+  const activeTopics = categories.filter((t) => t.noteCount > 0).length;
 
   return (
     <>
