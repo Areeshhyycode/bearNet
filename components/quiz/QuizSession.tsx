@@ -67,8 +67,8 @@ export function QuizSession({ mode }: { mode: "quiz" | "exam" }) {
         count: next.count,
         notes: notes.slice(0, 12).map((note) => ({
           title: note.title,
-          topic: note.topic,
-          body: note.body.join("\n\n"),
+          topic: note.category,
+          body: note.content,
         })),
       };
 

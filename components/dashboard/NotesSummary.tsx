@@ -8,6 +8,7 @@ import { InsetBox } from "@/components/ui/card";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { useNotes } from "@/lib/notes-store";
 import { formatRelative } from "@/lib/utils";
+import { preview } from "@/lib/note-view";
 
 /** Most recently updated notes, straight from the store. */
 function useRecentNotes(count = 4) {
@@ -26,9 +27,9 @@ function useRecentNotes(count = 4) {
 
 /** Live detail block inside the "My Notes" module card. */
 export function NotesModuleInset() {
-  const { notes, topics } = useNotes();
+  const { notes, categories } = useNotes();
   const [latest] = useRecentNotes(1);
-  const activeTopics = topics.filter((t) => t.noteCount > 0).length;
+  const activeTopics = categories.filter((t) => t.noteCount > 0).length;
 
   return (
     <InsetBox className="flex flex-col gap-1.5">
@@ -109,10 +110,10 @@ export function RecentNotesSection() {
                 {note.title}
               </h3>
               <p className="line-clamp-2 font-body-sm text-body-sm text-on-surface-variant">
-                {note.preview}
+                {preview(note)}
               </p>
               <div className="mt-auto flex items-center justify-between pt-2 font-label-badge text-label-badge text-on-surface-variant">
-                <span className="truncate">{note.topic}</span>
+                <span className="truncate">{note.category}</span>
                 <span className="shrink-0">{formatRelative(note.updatedAt)}</span>
               </div>
             </Link>
