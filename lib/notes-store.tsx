@@ -6,244 +6,165 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
-import { NOTES, NOTE_TOPICS, type Note, type NoteTopic } from "./mock-data";
-import { readStorage, writeStorage } from "./storage";
+import { useAuth } from "./auth-context";
+import { NOTE_CATEGORIES, type Note, type NoteInput, type Visibility } from "./types";
 
-const STORAGE_KEY = "bearnet:notes:v1";
+/**
+ * Notes are stored in MongoDB and reached through /api/notes.
+ *
+ * Ownership is enforced server-side; this store only mirrors what the API
+ * returns so the UI stays snappy.
+ */
 
-type NotesState = {
-  notes: Note[];
-  topics: NoteTopic[];
-};
-
-const SEED: NotesState = { notes: NOTES, topics: NOTE_TOPICS };
-
-export type NoteDraft = {
-  id?: string;
-  title: string;
-  topicId: string;
-  body: string;
-  visibility: "private" | "public";
-  tags?: string[];
-};
+export type NoteCategory = { id: string; title: string; emoji: string; noteCount: number };
 
 type NotesContextValue = {
   notes: Note[];
-  /** Topics with a live note count derived from `notes`. */
-  topics: NoteTopic[];
-  /** False until localStorage has been read — used to avoid flashing seed data. */
-  hydrated: boolean;
+  categories: NoteCategory[];
+  loading: boolean;
+  error: string | null;
   getNote: (id: string) => Note | undefined;
-  saveNote: (draft: NoteDraft) => string;
-  deleteNote: (id: string) => void;
-  addTopic: (title: string, emoji?: string) => string;
-  deleteTopic: (id: string) => void;
-  resetToSeed: () => void;
+  saveNote: (input: NoteInput & { id?: string }) => Promise<Note | null>;
+  deleteNote: (id: string) => Promise<boolean>;
+  setVisibility: (id: string, visibility: Visibility) => Promise<Note | null>;
+  refresh: () => Promise<void>;
 };
 
 const NotesContext = createContext<NotesContextValue | null>(null);
 
-/* -------------------------------- helpers -------------------------------- */
-
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
-}
-
-/** Slug that does not collide with anything already stored. */
-function uniqueId(base: string, taken: string[]) {
-  const root = base || "note";
-  if (!taken.includes(root)) return root;
-
-  let n = 2;
-  while (taken.includes(`${root}-${n}`)) n += 1;
-  return `${root}-${n}`;
-}
-
-/** Split a textarea value into paragraphs. */
-function toParagraphs(body: string) {
-  return body
-    .split(/\n{2,}/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-}
-
-function buildPreview(paragraphs: string[]) {
-  const first = paragraphs[0] ?? "";
-  return first.length > 180 ? `${first.slice(0, 177)}…` : first;
-}
-
-function readMinutes(body: string) {
-  const words = body.trim() ? body.trim().split(/\s+/).length : 0;
-  return Math.max(1, Math.round(words / 200));
-}
-
-/* -------------------------------- provider ------------------------------- */
-
 export function NotesProvider({ children }: { children: React.ReactNode }) {
-  // Server and first client render both use the seed, so markup matches.
-  const [state, setState] = useState<NotesState>(SEED);
-  const [hydrated, setHydrated] = useState(false);
-  const hydratedRef = useRef(false);
+  const { user } = useAuth();
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load whatever is in storage, once.
-  useEffect(() => {
-    const stored = readStorage<NotesState | null>(STORAGE_KEY, null);
-    if (stored?.notes && stored?.topics) setState(stored);
-    hydratedRef.current = true;
-    setHydrated(true);
-  }, []);
+  const refresh = useCallback(async () => {
+    if (!user) {
+      setNotes([]);
+      setLoading(false);
+      return;
+    }
 
-  // Persist every change — but never before the load above has run,
-  // or the seed would overwrite real notes.
+    setLoading(true);
+    try {
+      const response = await fetch("/api/notes", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error ?? "Could not load notes.");
+      setNotes(data.notes ?? []);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load notes.");
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  // Reload whenever the signed-in user changes, so one account never
+  // shows another account's notes.
   useEffect(() => {
-    if (!hydratedRef.current) return;
-    writeStorage(STORAGE_KEY, state);
-  }, [state]);
+    void refresh();
+  }, [refresh]);
 
   const getNote = useCallback(
-    (id: string) => state.notes.find((note) => note.id === id),
-    [state.notes],
+    (id: string) => notes.find((note) => note.id === id),
+    [notes],
   );
 
-  const saveNote = useCallback((draft: NoteDraft) => {
-    let savedId = draft.id ?? "";
+  const saveNote = useCallback(
+    async (input: NoteInput & { id?: string }) => {
+      const { id, ...body } = input;
+      const response = await fetch(id ? `/api/notes/${id}` : "/api/notes", {
+        method: id ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await response.json();
 
-    setState((prev) => {
-      const paragraphs = toParagraphs(draft.body);
-      const topic = prev.topics.find((t) => t.id === draft.topicId);
-      const now = new Date().toISOString();
-      const title = draft.title.trim() || "Untitled note";
-
-      // Update in place.
-      if (draft.id) {
-        const existing = prev.notes.find((n) => n.id === draft.id);
-        if (existing) {
-          savedId = existing.id;
-          const updated: Note = {
-            ...existing,
-            title,
-            topicId: draft.topicId,
-            topic: topic?.title ?? existing.topic,
-            preview: buildPreview(paragraphs),
-            body: paragraphs,
-            visibility: draft.visibility,
-            tags: draft.tags ?? existing.tags,
-            readMinutes: readMinutes(draft.body),
-            updatedAt: now,
-          };
-          return {
-            ...prev,
-            notes: prev.notes.map((n) => (n.id === existing.id ? updated : n)),
-          };
-        }
+      if (!response.ok) {
+        setError(data?.error ?? "Could not save the note.");
+        return null;
       }
 
-      // Create.
-      const id = uniqueId(
-        slugify(title),
-        prev.notes.map((n) => n.id),
-      );
-      savedId = id;
-
-      const created: Note = {
-        id,
-        title,
-        topicId: draft.topicId,
-        topic: topic?.title ?? "Networking Basics",
-        emoji: topic?.emoji ?? "📝",
-        preview: buildPreview(paragraphs),
-        body: paragraphs,
-        visibility: draft.visibility,
-        tags: draft.tags ?? [],
-        readMinutes: readMinutes(draft.body),
-        updatedAt: now,
-      };
-
-      return { ...prev, notes: [created, ...prev.notes] };
-    });
-
-    return savedId;
-  }, []);
-
-  const deleteNote = useCallback((id: string) => {
-    setState((prev) => ({
-      ...prev,
-      notes: prev.notes.filter((note) => note.id !== id),
-    }));
-  }, []);
-
-  const addTopic = useCallback((title: string, emoji = "📘") => {
-    let newId = "";
-
-    setState((prev) => {
-      const clean = title.trim();
-      if (!clean) return prev;
-
-      newId = uniqueId(
-        slugify(clean),
-        prev.topics.map((t) => t.id),
-      );
-
-      return {
-        ...prev,
-        topics: [...prev.topics, { id: newId, title: clean, emoji, noteCount: 0 }],
-      };
-    });
-
-    return newId;
-  }, []);
-
-  /** Removes the topic and every note filed under it. */
-  const deleteTopic = useCallback((id: string) => {
-    setState((prev) => ({
-      topics: prev.topics.filter((topic) => topic.id !== id),
-      notes: prev.notes.filter((note) => note.topicId !== id),
-    }));
-  }, []);
-
-  const resetToSeed = useCallback(() => setState(SEED), []);
-
-  // Note counts always reflect reality rather than a stored number.
-  const topics = useMemo(
-    () =>
-      state.topics.map((topic) => ({
-        ...topic,
-        noteCount: state.notes.filter((note) => note.topicId === topic.id).length,
-      })),
-    [state.topics, state.notes],
+      const saved: Note = data.note;
+      setNotes((prev) => {
+        const without = prev.filter((note) => note.id !== saved.id);
+        return [saved, ...without].sort(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+        );
+      });
+      setError(null);
+      return saved;
+    },
+    [],
   );
+
+  const deleteNote = useCallback(async (id: string) => {
+    // Optimistic: put it back if the server disagrees.
+    const snapshot = notes;
+    setNotes((prev) => prev.filter((note) => note.id !== id));
+
+    const response = await fetch(`/api/notes/${id}`, { method: "DELETE" });
+    if (!response.ok) {
+      setNotes(snapshot);
+      setError("Could not delete that note.");
+      return false;
+    }
+    return true;
+  }, [notes]);
+
+  const setVisibility = useCallback(async (id: string, visibility: Visibility) => {
+    const response = await fetch(`/api/notes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ visibility }),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      setError(data?.error ?? "Could not change visibility.");
+      return null;
+    }
+
+    const saved: Note = data.note;
+    setNotes((prev) => prev.map((note) => (note.id === saved.id ? saved : note)));
+    return saved;
+  }, []);
+
+  /** Standard shelves plus any custom category the learner has used. */
+  const categories = useMemo<NoteCategory[]>(() => {
+    const counts = new Map<string, number>();
+    for (const note of notes) {
+      counts.set(note.category, (counts.get(note.category) ?? 0) + 1);
+    }
+
+    const custom = [...counts.keys()].filter(
+      (name) => !NOTE_CATEGORIES.includes(name as (typeof NOTE_CATEGORIES)[number]),
+    );
+
+    return [...NOTE_CATEGORIES, ...custom].map((title) => ({
+      id: title,
+      title,
+      emoji: notes.find((n) => n.category === title)?.emoji ?? "📘",
+      noteCount: counts.get(title) ?? 0,
+    }));
+  }, [notes]);
 
   const value = useMemo<NotesContextValue>(
     () => ({
-      notes: state.notes,
-      topics,
-      hydrated,
+      notes,
+      categories,
+      loading,
+      error,
       getNote,
       saveNote,
       deleteNote,
-      addTopic,
-      deleteTopic,
-      resetToSeed,
+      setVisibility,
+      refresh,
     }),
-    [
-      state.notes,
-      topics,
-      hydrated,
-      getNote,
-      saveNote,
-      deleteNote,
-      addTopic,
-      deleteTopic,
-      resetToSeed,
-    ],
+    [notes, categories, loading, error, getNote, saveNote, deleteNote, setVisibility, refresh],
   );
 
   return <NotesContext.Provider value={value}>{children}</NotesContext.Provider>;
@@ -251,8 +172,6 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
 
 export function useNotes() {
   const context = useContext(NotesContext);
-  if (!context) {
-    throw new Error("useNotes must be used inside <NotesProvider>");
-  }
+  if (!context) throw new Error("useNotes must be used inside <NotesProvider>");
   return context;
 }

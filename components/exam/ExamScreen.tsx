@@ -7,7 +7,7 @@ import { QuizSession } from "@/components/quiz/QuizSession";
 import { useProgress } from "@/lib/progress-store";
 
 export function ExamScreen() {
-  const { runs, examsCompleted, profile } = useProgress();
+  const { runs, examsCompleted, preferences } = useProgress();
 
   const examRuns = runs.filter((run) => run.mode === "exam");
   const best = examRuns.reduce(
@@ -37,7 +37,7 @@ export function ExamScreen() {
         badges={
           <>
             <Badge tone="blush" size="md">
-              <span aria-hidden>🎓</span> {profile.certTarget}
+              <span aria-hidden>🎓</span> {preferences.certTarget}
             </Badge>
             <Badge tone="neutral" size="md">
               {examsCompleted === 0

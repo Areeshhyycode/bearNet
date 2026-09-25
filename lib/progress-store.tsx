@@ -9,12 +9,17 @@ import {
   useRef,
   useState,
 } from "react";
-import { readStorage, writeStorage } from "./storage";
+import { useAuth } from "./auth-context";
+import {
+  DEFAULT_PREFERENCES,
+  type ProgressDoc,
+  type RunSummary,
+  type UserPreferences,
+} from "./types";
 import type { QuizResult } from "./quiz-types";
 
-const STORAGE_KEY = "bearnet:progress:v1";
+/** XP, streaks and scores, persisted per user in MongoDB. */
 
-/** XP awarded per action. */
 export const XP = {
   noteSaved: 10,
   perCorrectQuiz: 5,
@@ -25,89 +30,38 @@ export const XP = {
 
 const XP_PER_LEVEL = 500;
 
-export type RunSummary = {
-  id: string;
-  mode: "quiz" | "exam";
-  topic: string;
-  difficulty: string;
-  score: number;
-  total: number;
-  percent: number;
-  passed: boolean;
-  seconds: number;
-  finishedAt: string;
-  byTopic: { topic: string; correct: number; total: number; percent: number }[];
-};
+export const RANKS = [
+  { id: "beginner", title: "Beginner", emoji: "🌱", minLevel: 1 },
+  { id: "explorer", title: "Network Explorer", emoji: "🎀", minLevel: 2 },
+  { id: "learner", title: "Network Learner", emoji: "🐻", minLevel: 4 },
+  { id: "defender", title: "Cyber Defender", emoji: "🌸", minLevel: 6 },
+  { id: "vapt", title: "VAPT Apprentice", emoji: "🐻‍❄️", minLevel: 9 },
+] as const;
 
-export type Profile = {
-  name: string;
-  handle: string;
-  dailyGoalMinutes: number;
-  certTarget: string;
-  buddy: "grizzly" | "panda" | "polar";
-  accent: string;
-  prefs: {
-    reminders: boolean;
-    sounds: boolean;
-    weeklyDigest: boolean;
-    publicProfile: boolean;
-    reducedMotion: boolean;
-  };
-};
+export type Rank = (typeof RANKS)[number];
 
-type ProgressState = {
-  xp: number;
-  runs: RunSummary[];
-  labsSolved: string[];
-  /** ISO YYYY-MM-DD for every day with any activity. */
-  studyDays: string[];
-  /** Minutes studied, keyed by ISO date. */
-  minutesByDay: Record<string, number>;
-  notesWritten: number;
-  profile: Profile;
-};
+export function levelFromXp(xp: number) {
+  return Math.floor(xp / XP_PER_LEVEL) + 1;
+}
 
-const DEFAULT_PROFILE: Profile = {
-  name: "Bear Learner",
-  handle: "@bearnet",
-  dailyGoalMinutes: 45,
-  certTarget: "CompTIA Network+ N10-008",
-  buddy: "panda",
-  accent: "blush",
-  prefs: {
-    reminders: true,
-    sounds: false,
-    weeklyDigest: true,
-    publicProfile: false,
-    reducedMotion: false,
-  },
-};
-
-const EMPTY: ProgressState = {
-  xp: 0,
-  runs: [],
-  labsSolved: [],
-  studyDays: [],
-  minutesByDay: {},
-  notesWritten: 0,
-  profile: DEFAULT_PROFILE,
-};
-
-/* -------------------------------- helpers -------------------------------- */
+export function rankForLevel(level: number): Rank {
+  let current: Rank = RANKS[0];
+  for (const rank of RANKS) {
+    if (level >= rank.minLevel) current = rank;
+  }
+  return current;
+}
 
 function isoDay(date = new Date()) {
   return date.toISOString().slice(0, 10);
 }
 
-/** Consecutive days of activity, counting back from today or yesterday. */
+/** Consecutive days of activity counting back from today or yesterday. */
 function computeStreak(days: string[]) {
   if (days.length === 0) return 0;
-
   const set = new Set(days);
-  const today = new Date();
-  const cursor = new Date(today);
+  const cursor = new Date();
 
-  // A streak stays alive if you studied today or yesterday.
   if (!set.has(isoDay(cursor))) {
     cursor.setDate(cursor.getDate() - 1);
     if (!set.has(isoDay(cursor))) return 0;
@@ -121,32 +75,18 @@ function computeStreak(days: string[]) {
   return streak;
 }
 
-export function levelFromXp(xp: number) {
-  return Math.floor(xp / XP_PER_LEVEL) + 1;
-}
-
-export const RANKS = [
-  { id: "beginner", title: "Beginner", emoji: "🌱", minLevel: 1 },
-  { id: "explorer", title: "Network Explorer", emoji: "🎀", minLevel: 2 },
-  { id: "learner", title: "Network Learner", emoji: "🐻", minLevel: 4 },
-  { id: "defender", title: "Cyber Defender", emoji: "🌸", minLevel: 6 },
-  { id: "vapt", title: "VAPT Apprentice", emoji: "🐻‍❄️", minLevel: 9 },
-] as const;
-
-export type Rank = (typeof RANKS)[number];
-
-export function rankForLevel(level: number): Rank {
-  let current: Rank = RANKS[0];
-  for (const rank of RANKS) {
-    if (level >= rank.minLevel) current = rank;
-  }
-  return current;
-}
-
-/* -------------------------------- context -------------------------------- */
+const EMPTY: Omit<ProgressDoc, "userId"> = {
+  xp: 0,
+  runs: [],
+  labsSolved: [],
+  studyDays: [],
+  minutesByDay: {},
+  notesWritten: 0,
+  preferences: DEFAULT_PREFERENCES,
+};
 
 type ProgressContextValue = {
-  hydrated: boolean;
+  loading: boolean;
   xp: number;
   level: number;
   rank: Rank;
@@ -161,48 +101,86 @@ type ProgressContextValue = {
   labsSolved: string[];
   notesWritten: number;
   minutesThisWeek: number;
+  minutesToday: number;
   weeklyActivity: { day: string; date: string; minutes: number }[];
   topicMastery: { topic: string; percent: number; total: number }[];
-  profile: Profile;
+  preferences: UserPreferences;
   recordRun: (result: QuizResult) => void;
   recordLabSolved: (id: string) => void;
   recordNoteSaved: () => void;
   recordStudyMinutes: (minutes: number) => void;
-  updateProfile: (patch: Partial<Profile>) => void;
+  updatePreferences: (patch: Partial<UserPreferences>) => void;
   resetProgress: () => void;
 };
 
 const ProgressContext = createContext<ProgressContextValue | null>(null);
 
 export function ProgressProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<ProgressState>(EMPTY);
-  const [hydrated, setHydrated] = useState(false);
-  const hydratedRef = useRef(false);
+  const { user } = useAuth();
+  const [state, setState] = useState<Omit<ProgressDoc, "userId">>(EMPTY);
+  const [loading, setLoading] = useState(true);
 
+  const loadedRef = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Load this user's document.
   useEffect(() => {
-    const stored = readStorage<Partial<ProgressState> | null>(STORAGE_KEY, null);
-    if (stored) {
-      setState({
-        ...EMPTY,
-        ...stored,
-        profile: {
-          ...DEFAULT_PROFILE,
-          ...(stored.profile ?? {}),
-          prefs: { ...DEFAULT_PROFILE.prefs, ...(stored.profile?.prefs ?? {}) },
-        },
-      });
-    }
-    hydratedRef.current = true;
-    setHydrated(true);
-  }, []);
+    let cancelled = false;
+    loadedRef.current = false;
 
+    (async () => {
+      if (!user) {
+        setState(EMPTY);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const response = await fetch("/api/progress", { cache: "no-store" });
+        const data = await response.json();
+        if (!cancelled && response.ok && data.progress) {
+          const { userId: _drop, ...rest } = data.progress as ProgressDoc;
+          setState({ ...EMPTY, ...rest });
+        }
+      } catch {
+        // Keep the empty state; the UI still works, it just shows zeros.
+      } finally {
+        if (!cancelled) {
+          loadedRef.current = true;
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  /**
+   * Persist changes, debounced so a burst of updates becomes one request.
+   * Never fires before the initial load, or an empty state would overwrite
+   * real data.
+   */
   useEffect(() => {
-    if (!hydratedRef.current) return;
-    writeStorage(STORAGE_KEY, state);
-  }, [state]);
+    if (!user || !loadedRef.current) return;
 
-  /** Every scoring action also marks today as a study day. */
-  const touchDay = useCallback((draft: ProgressState): ProgressState => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      void fetch("/api/progress", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(state),
+      }).catch(() => {});
+    }, 600);
+
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, [state, user]);
+
+  const touchDay = useCallback((draft: Omit<ProgressDoc, "userId">) => {
     const today = isoDay();
     if (draft.studyDays.includes(today)) return draft;
     return { ...draft, studyDays: [...draft.studyDays, today] };
@@ -285,20 +263,24 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
     [touchDay],
   );
 
-  const updateProfile = useCallback((patch: Partial<Profile>) => {
+  const updatePreferences = useCallback((patch: Partial<UserPreferences>) => {
     setState((prev) => ({
       ...prev,
-      profile: {
-        ...prev.profile,
+      preferences: {
+        ...prev.preferences,
         ...patch,
-        prefs: { ...prev.profile.prefs, ...(patch.prefs ?? {}) },
+        timer: { ...prev.preferences.timer, ...(patch.timer ?? {}) },
+        prefs: { ...prev.preferences.prefs, ...(patch.prefs ?? {}) },
       },
     }));
   }, []);
 
-  const resetProgress = useCallback(() => setState(EMPTY), []);
+  const resetProgress = useCallback(
+    () => setState({ ...EMPTY, preferences: DEFAULT_PREFERENCES }),
+    [],
+  );
 
-  /* ------------------------------ derived ------------------------------- */
+  /* ------------------------------- derived ------------------------------- */
 
   const level = levelFromXp(state.xp);
   const xpIntoLevel = state.xp % XP_PER_LEVEL;
@@ -349,7 +331,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<ProgressContextValue>(
     () => ({
-      hydrated,
+      loading,
       xp: state.xp,
       level,
       rank: rankForLevel(level),
@@ -364,23 +346,24 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
       labsSolved: state.labsSolved,
       notesWritten: state.notesWritten,
       minutesThisWeek: weeklyActivity.reduce((sum, d) => sum + d.minutes, 0),
+      minutesToday: weeklyActivity[weeklyActivity.length - 1]?.minutes ?? 0,
       weeklyActivity,
       topicMastery,
-      profile: state.profile,
+      preferences: state.preferences,
       recordRun,
       recordLabSolved,
       recordNoteSaved,
       recordStudyMinutes,
-      updateProfile,
+      updatePreferences,
       resetProgress,
     }),
     [
-      hydrated,
+      loading,
       state.xp,
       state.runs,
       state.labsSolved,
       state.notesWritten,
-      state.profile,
+      state.preferences,
       level,
       xpIntoLevel,
       streak,
@@ -391,7 +374,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
       recordLabSolved,
       recordNoteSaved,
       recordStudyMinutes,
-      updateProfile,
+      updatePreferences,
       resetProgress,
     ],
   );
@@ -403,8 +386,6 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
 
 export function useProgress() {
   const context = useContext(ProgressContext);
-  if (!context) {
-    throw new Error("useProgress must be used inside <ProgressProvider>");
-  }
+  if (!context) throw new Error("useProgress must be used inside <ProgressProvider>");
   return context;
 }
